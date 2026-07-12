@@ -2,22 +2,36 @@ import time
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Ticket
+from app.models import Queue, Ticket
+
 
 
 def resolve(db: Session, ticket_id: str, effort_logged: int) -> dict:
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise ValueError("ticket_not_found")
-    time.sleep(0.05)  # demo: widens race window for concurrent resolve/add
     if ticket.quantity <= 0:
         raise ValueError("out_of_stock")
     if effort_logged < ticket.complexity:
         raise ValueError("insufficient_effort", ticket.complexity, effort_logged)
-    # No validation that effort_logged or overtime use STANDARD_EFFORT_BLOCKS
     overtime = effort_logged - ticket.complexity
-    ticket.quantity -= 1
-    ticket.queue.current_ticket_count -= 1
+    # Decrement atomically (single UPDATE ... WHERE quantity > 0) instead of
+    # read-modify-write on the Python object, so two concurrent resolves of
+    # the last unit can't both pass the quantity check above and both
+    # succeed in decrementing past zero.
+    updated_rows = (
+        db.query(Ticket)
+        .filter(Ticket.id == ticket_id, Ticket.quantity > 0)
+        .update({Ticket.quantity: Ticket.quantity - 1}, synchronize_session=False)
+    )
+    if updated_rows == 0:
+        db.rollback()
+        raise ValueError("out_of_stock")
+    if ticket.queue_id:
+        db.query(Queue).filter(Queue.id == ticket.queue_id).update(
+            {Queue.current_ticket_count: Queue.current_ticket_count - 1},
+            synchronize_session=False,
+        )
     db.commit()
     db.refresh(ticket)
     return {
