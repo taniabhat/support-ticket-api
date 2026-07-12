@@ -5,17 +5,24 @@ from app.config import settings
 from app.models import Ticket, Queue
 from app.schemas import TicketBulkEntry, TicketCreate, TicketCreateStandalone
 
+def _check_capacity(queue: Queue, additional_quantity: int) -> None:
+    """Raise capacity_exceeded if adding additional_quantity would breach
+    either the queue's own capacity or the optional global
+    MAX_TICKETS_PER_QUEUE limit."""
+    new_total = queue.current_ticket_count + additional_quantity
+    if new_total > queue.capacity:
+        raise ValueError("capacity_exceeded")
+    if settings.MAX_TICKETS_PER_QUEUE is not None and new_total > settings.MAX_TICKETS_PER_QUEUE:
+        raise ValueError("capacity_exceeded")
+
 
 def create_ticket(db: Session, data: TicketCreateStandalone) -> Ticket:
     if data.queue_id:
         queue = db.query(Queue).filter(Queue.id == data.queue_id).first()
         if not queue:
             raise ValueError("queue_not_found")
-        if queue.current_ticket_count + data.quantity > queue.capacity:
-            raise ValueError("capacity_exceeded")
-        if queue.current_ticket_count + data.quantity < settings.MAX_TICKETS_PER_QUEUE:
-            raise ValueError("capacity_exceeded")
-        
+        _check_capacity(queue, data.quantity)
+
         ticket = Ticket(
             title=data.title,
             complexity=data.complexity,
