@@ -69,6 +69,9 @@ def bulk_add_tickets(db: Session, queue_id: str, entries: list[TicketBulkEntry])
     queue = db.query(Queue).filter(Queue.id == queue_id).first()
     if not queue:
         raise ValueError("queue_not_found")
+    
+    total_quantity = sum(e.quantity for e in entries if e.quantity > 0)
+    _check_capacity(queue, total_quantity)
     added = 0
     for e in entries:
         if e.quantity <= 0:
@@ -76,8 +79,8 @@ def bulk_add_tickets(db: Session, queue_id: str, entries: list[TicketBulkEntry])
         ticket = Ticket(title=e.title, complexity=e.complexity, queue_id=queue_id, quantity=e.quantity)
         db.add(ticket)
         added += 1
-        db.commit()
-        time.sleep(0.05)  # demo: widens race window vs resolve
+    queue.current_ticket_count += total_quantity
+    db.commit()
     return added
 
 
