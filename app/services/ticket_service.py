@@ -49,10 +49,9 @@ def add_ticket_to_queue(db: Session, queue_id: str, data: TicketCreate) -> Ticke
     queue = db.query(Queue).filter(Queue.id == queue_id).first()
     if not queue:
         raise ValueError("queue_not_found")
-    if queue.current_ticket_count + data.quantity > queue.capacity:
-        raise ValueError("capacity_exceeded")
-    if queue.current_ticket_count + data.quantity < settings.MAX_TICKETS_PER_QUEUE:
-        raise ValueError("capacity_exceeded")
+    
+    _check_capacity(queue, data.quantity)
+
     ticket = Ticket(
         title=data.title,
         complexity=data.complexity,
