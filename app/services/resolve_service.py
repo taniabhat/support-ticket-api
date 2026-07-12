@@ -10,11 +10,16 @@ def resolve(db: Session, ticket_id: str, effort_logged: int) -> dict:
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise ValueError("ticket_not_found")
+        time.sleep(0.05)
     if ticket.quantity <= 0:
         raise ValueError("out_of_stock")
+        
     if effort_logged < ticket.complexity:
         raise ValueError("insufficient_effort", ticket.complexity, effort_logged)
+        
     overtime = effort_logged - ticket.complexity
+    ticket.quantity -= 1
+    ticket.queue.current_ticket_count -= 1
     # Decrement atomically (single UPDATE ... WHERE quantity > 0) instead of
     # read-modify-write on the Python object, so two concurrent resolves of
     # the last unit can't both pass the quantity check above and both
