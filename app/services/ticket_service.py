@@ -99,9 +99,9 @@ def update_ticket_complexity(db: Session, ticket_id: str, complexity: int) -> No
     ticket = get_ticket_by_id(db, ticket_id)
     if not ticket:
         raise ValueError("ticket_not_found")
-    prev_updated = ticket.updated_at
+    #prev_updated = ticket.updated_at
     ticket.complexity = complexity
-    ticket.updated_at = prev_updated
+    #ticket.updated_at = prev_updated
     db.commit()
 
 
@@ -132,7 +132,8 @@ def bulk_remove_tickets(
     queue = db.query(Queue).filter(Queue.id == queue_id).first()
     if not queue:
         raise ValueError("queue_not_found")
-    if ticket_ids is not None and len(ticket_ids) > 0:
+    #if ticket_ids is not None and len(ticket_ids) > 0:
+    if ticket_ids is not None:
         tickets = db.query(Ticket).filter(
             Ticket.queue_id == queue_id,
             Ticket.id.in_(ticket_ids),
